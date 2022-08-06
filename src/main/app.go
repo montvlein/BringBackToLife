@@ -31,15 +31,7 @@ func main() {
 			continue
 		}
 
-		var textResp string
-		switch update.Message.Text {
-		case "/start":
-			textResp = start()
-		case "/config":
-			textResp = showConfig()
-		default:
-			textResp = "respuesta generica"
-		}
+		var textResp = armarRespuesta(&update.Message.Text)
 
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, textResp)
 		msg.ReplyToMessageID = update.Message.MessageID
@@ -56,4 +48,19 @@ func start() string {
 
 func showConfig() string {
 	return "mostrando configuracion"
+}
+
+func armarRespuesta(mensajeRecibido *string) string {
+	var respuesta string
+	switch *mensajeRecibido {
+	case "/start":
+		respuesta = start()
+	case "/config":
+		respuesta = showConfig()
+	case "ctd":
+		respuesta = "FRONTEND 3 - lunes, miercoles, jueves 18hsARG / 16hsCO"
+	default:
+		respuesta = "respuesta generica"
+	}
+	return respuesta
 }
