@@ -4,8 +4,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/joho/godotenv"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/joho/godotenv"
 )
 
 func init() {
@@ -34,9 +34,9 @@ func main() {
 		var textResp string
 		switch update.Message.Text {
 		case "/start":
-			textResp = "bienvenido"
+			textResp = start()
 		case "/config":
-			textResp = "cargando config"
+			textResp = showConfig()
 		default:
 			textResp = "respuesta generica"
 		}
@@ -48,4 +48,12 @@ func main() {
 			log.Println(err)
 		}
 	}
+}
+
+func start() string {
+	return "bienvenido"
+}
+
+func showConfig() string {
+	return "mostrando configuracion"
 }
