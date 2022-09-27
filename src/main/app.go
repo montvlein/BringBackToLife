@@ -24,19 +24,18 @@ func init() {
 }
 
 const (
-	CALENDAR string = "FRONTEND 3 - lunes, miercoles, jueves 18hsARG / 16hsCO"
-	LINK string = "https://digitalhouse.zoom.us/my/aulavirtual94"
 	start string = "BIENVENIDE\n\n" + help
 	help string = "Comandos de ayuda\n" +
 	"help - muestra la lista de comandos\n" +
 	"open - abre el menu de opciones/teclado rapido\n" +
 	"close - cierra el menu de opciones/teclado rapido\n" +
-	"link - te dara el link de los encuentros de zoom\n" +
-	"calendar - te mostrara las fechas importantes de la materia\n"
+	"proximos - te mostrara las fechas importantes de la materia\n" +
+	"agregar - crea un evento nuevo\n"
 )
 
 var count int8 = 3
 var textResp string
+var calendarApi googleCalendar = googleCalendar{service: GetOauthAndCalendar()}
 
 func main() {
 	runBot()
@@ -84,11 +83,11 @@ func armarRespuesta(mensajeRecibido *string) string {
 	case "help":
 		respuesta = help
 		count = 3
-	case "calendar":
-		respuesta = getEvents(GetOauthAndCalendar())
+	case "proximos":
+		respuesta = calendarApi.getEvents()
 		count = 3
-	case "link":
-		respuesta = fmt.Sprintf("link:\n%v\npass:\n%v", LINK, os.Getenv("LINK_PASS"))
+	case "crear":
+		calendarApi.createEvent()
 		count = 3
 	case "open":
 		respuesta = "menu abierto"
@@ -112,6 +111,10 @@ var optionKeyboard = tgbotapi.NewReplyKeyboard(
 	),
 )
 
+type googleCalendar struct{
+	service *calendar.Service
+}
+
 func GetOauthAndCalendar() (*calendar.Service){
 	ctx := context.Background()
 	service, err := calendar.NewService(ctx, option.WithCredentialsFile("bbtl-api-conection.json"))
@@ -121,9 +124,9 @@ func GetOauthAndCalendar() (*calendar.Service){
 	return service
 }
 
-func getEvents(service *calendar.Service) string {
+func (calApi googleCalendar) getEvents() string {
 	t := time.Now().Format(time.RFC3339)
-	events, err := service.Events.List(os.Getenv("calendarId")).ShowDeleted(false).
+	events, err := calApi.service.Events.List(os.Getenv("calendarId")).ShowDeleted(false).
 		SingleEvents(true).TimeMin(t).MaxResults(10).OrderBy("startTime").Do()
 	if err != nil {
 		log.Fatalf("Unable to retrieve next ten of the user's events: %v", err)
@@ -148,4 +151,33 @@ func getEvents(service *calendar.Service) string {
 		}
 	}
 	return info
+}
+
+func (calApi googleCalendar) createEvent(titulo, lugar, descripcion, inicio, fin string ) {
+
+eventSummary := &calendar.Event{
+	Summary: titulo, // "Google I/O 2015"
+	Location: lugar, // "800 Howard St., San Francisco, CA 94103"
+	Description: descripcion, // "A chance to hear more about Google's developer products."
+	Start: &calendar.EventDateTime{
+	  DateTime: inicio, // "2015-05-28T09:00:00-07:00"
+	  TimeZone: "America/Los_Angeles",
+	},
+	End: &calendar.EventDateTime{
+	  DateTime: fin, // "2015-05-28T17:00:00-07:00"
+	  TimeZone: "America/Los_Angeles",
+	},
+	Recurrence: []string{"RRULE:FREQ=DAILY;COUNT=2"},
+	Attendees: []*calendar.EventAttendee{
+	  &calendar.EventAttendee{Email:"lpage@example.com"},
+	  &calendar.EventAttendee{Email:"sbrin@example.com"},
+	},
+  }
+
+  event, err := calApi.service.Events.Insert(os.Getenv("calendarId"), eventSummary).Do()
+  if err != nil {
+	log.Fatalf("Unable to create event. %v\n", err)
+  }
+  fmt.Printf("Event created: %s\n", event.HtmlLink)
+
 }
