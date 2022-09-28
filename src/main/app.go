@@ -19,7 +19,7 @@ import (
 func init() {
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Fatalf("Error loading .env file\n v%", err.Error())
+		log.Fatalf("Error loading .env file\n %v", err.Error())
 	}
 }
 
@@ -29,6 +29,7 @@ const (
 	"help - muestra la lista de comandos\n" +
 	"open - abre el menu de opciones/teclado rapido\n" +
 	"close - cierra el menu de opciones/teclado rapido\n" +
+	"siguiente - te mostrara el evento mas proximo\n" +
 	"proximos - te mostrara las fechas importantes de la materia\n" +
 	"agregar - crea un evento nuevo\n"
 )
@@ -83,11 +84,19 @@ func armarRespuesta(mensajeRecibido *string) string {
 	case "help":
 		respuesta = help
 		count = 3
+	case "siguiente":
+		respuesta = calendarApi.getNextEvent()
+		count = 3
 	case "proximos":
 		respuesta = calendarApi.getEvents()
 		count = 3
 	case "crear":
-		calendarApi.createEvent()
+		calendarApi.createEvent(
+			"Google I/O 2015",
+			"800 Howard St., San Francisco, CA 94103",
+			"A chance to hear more about Google's developer products.",
+			"2015-05-28T09:00:00-07:00",
+			"2015-05-28T17:00:00-07:00")
 		count = 3
 	case "open":
 		respuesta = "menu abierto"
@@ -153,9 +162,36 @@ func (calApi googleCalendar) getEvents() string {
 	return info
 }
 
+func (calApi googleCalendar) getNextEvent() string {
+	t := time.Now().Format(time.RFC3339)
+	events, err := calApi.service.Events.List(os.Getenv("calendarId")).ShowDeleted(false).
+		SingleEvents(true).TimeMin(t).MaxResults(1).OrderBy("startTime").Do()
+	if err != nil {
+		log.Fatalf("Unable to retrieve next user's event: %v", err.Error())
+	}
+	var info string
+	if len(events.Items) == 0 {
+		info = "No se encontraron eventos registrados."
+	} else {
+		for _, item := range events.Items {
+			date := item.Start.DateTime
+			d, err := time.Parse(time.RFC3339, date)
+			if err != nil {
+				log.Fatalf("Error al parsear el tiempo: %v", err)
+			}
+			if date == "" {
+				date = item.Start.Date
+			}
+			fmt.Printf("%v (%v)\n", item.Summary, d.Format(time.RFC850))
+			info = strings.Join([]string{info, item.Summary, "\n", d.Format(time.RFC850), "\n"}, " ")
+		}
+	}
+	return info
+}
+
 func (calApi googleCalendar) createEvent(titulo, lugar, descripcion, inicio, fin string ) {
 
-eventSummary := &calendar.Event{
+	eventSummary := &calendar.Event{
 	Summary: titulo, // "Google I/O 2015"
 	Location: lugar, // "800 Howard St., San Francisco, CA 94103"
 	Description: descripcion, // "A chance to hear more about Google's developer products."
