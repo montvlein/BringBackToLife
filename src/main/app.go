@@ -53,6 +53,8 @@ func runBot() {
 	updateConfig.Timeout = 30
 	updates := bot.GetUpdatesChan(updateConfig)
 
+	defer avisarProximoEvento(bot) // al entrar al for de updates no entra a esta funcion. Se necesita correr ambas en paralelo
+
 	for update := range updates {
 		if update.Message == nil {
 			continue
@@ -73,6 +75,7 @@ func runBot() {
 			log.Println(err)
 		}
 	}
+
 }
 
 func armarRespuesta(mensajeRecibido *string) string {
@@ -182,8 +185,29 @@ func (calApi googleCalendar) getNextEvent() string {
 			if date == "" {
 				date = item.Start.Date
 			}
-			fmt.Printf("%v (%v)\n", item.Summary, d.Format(time.RFC850))
 			info = strings.Join([]string{info, item.Summary, "\n", d.Format(time.RFC850), "\n"}, " ")
+		}
+	}
+	return info
+}
+
+func (calApi googleCalendar) getTimeNextEvent() string {
+	t := time.Now().Format(time.RFC3339)
+	events, err := calApi.service.Events.List(os.Getenv("calendarId")).ShowDeleted(false).
+		SingleEvents(true).TimeMin(t).MaxResults(1).OrderBy("startTime").Do()
+	if err != nil {
+		log.Fatalf("Unable to retrieve next user's event: %v", err.Error())
+	}
+	var info string
+	if len(events.Items) == 0 {
+		info = "No se encontraron eventos registrados."
+	} else {
+		for _, item := range events.Items {
+			date := item.Start.DateTime
+			if date == "" {
+				date = item.Start.Date
+			}
+			info=date
 		}
 	}
 	return info
@@ -216,4 +240,24 @@ func (calApi googleCalendar) createEvent(titulo, lugar, descripcion, inicio, fin
   }
   fmt.Printf("Event created: %s\n", event.HtmlLink)
 
+}
+
+func avisarProximoEvento(bot *tgbotapi.BotAPI) {
+	chat, _ := strconv.Atoi(os.Getenv("CHAT_ID"))
+
+	for range time.Tick(60 * time.Second) {
+		proximo := calendarApi.getNextEvent()
+		fechaProximo := calendarApi.getTimeNextEvent()
+		fecha, _ := time.Parse(time.RFC3339,fechaProximo)
+		diferencia := time.Until(fecha)
+		minutosFaltantes := int(diferencia.Minutes())
+		aviso := 30
+		log.Printf("faltan %v minutos para enviar el mensaje...\n", minutosFaltantes)
+		if minutosFaltantes == aviso {
+			log.Println("Faltan 30 min para el evento. Enviando mensaje")
+			mensaje := tgbotapi.NewMessage(int64(chat),proximo)
+			bot.Send(mensaje)
+			aviso = 0
+		}
+	}
 }
