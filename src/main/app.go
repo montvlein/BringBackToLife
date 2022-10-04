@@ -53,8 +53,12 @@ func runBot() {
 	updateConfig.Timeout = 30
 	updates := bot.GetUpdatesChan(updateConfig)
 
-	defer avisarProximoEvento(bot) // al entrar al for de updates no entra a esta funcion. Se necesita correr ambas en paralelo
+	go avisarProximoEvento(bot)
+	watchUpdates(updates, bot)
 
+}
+
+func watchUpdates(updates tgbotapi.UpdatesChannel, bot *tgbotapi.BotAPI) {
 	for update := range updates {
 		if update.Message == nil {
 			continue
@@ -75,7 +79,6 @@ func runBot() {
 			log.Println(err)
 		}
 	}
-
 }
 
 func armarRespuesta(mensajeRecibido *string) string {
@@ -118,7 +121,7 @@ func armarRespuesta(mensajeRecibido *string) string {
 var optionKeyboard = tgbotapi.NewReplyKeyboard(
 	tgbotapi.NewKeyboardButtonRow(
 		tgbotapi.NewKeyboardButton("help"),
-		tgbotapi.NewKeyboardButton("calendar"),
+		tgbotapi.NewKeyboardButton("proximos"),
 		tgbotapi.NewKeyboardButton("close"),
 	),
 )
@@ -244,20 +247,23 @@ func (calApi googleCalendar) createEvent(titulo, lugar, descripcion, inicio, fin
 
 func avisarProximoEvento(bot *tgbotapi.BotAPI) {
 	chat, _ := strconv.Atoi(os.Getenv("CHAT_ID"))
+	proximo := calendarApi.getNextEvent()
+	fechaProximo := calendarApi.getTimeNextEvent()
 
 	for range time.Tick(60 * time.Second) {
-		proximo := calendarApi.getNextEvent()
-		fechaProximo := calendarApi.getTimeNextEvent()
 		fecha, _ := time.Parse(time.RFC3339,fechaProximo)
 		diferencia := time.Until(fecha)
 		minutosFaltantes := int(diferencia.Minutes())
-		aviso := 30
-		log.Printf("faltan %v minutos para enviar el mensaje...\n", minutosFaltantes)
-		if minutosFaltantes == aviso {
-			log.Println("Faltan 30 min para el evento. Enviando mensaje")
-			mensaje := tgbotapi.NewMessage(int64(chat),proximo)
+		log.Printf("faltan %v minutos para enviar el proximo evento...\n", minutosFaltantes)
+		switch minutosFaltantes {
+		case 30:
+			mensaje := tgbotapi.NewMessage(int64(chat),"Faltan 30 min para el evento.\n" + proximo)
 			bot.Send(mensaje)
-			aviso = 0
+		case 0:
+			mensaje := tgbotapi.NewMessage(int64(chat),"Es ahora... " + proximo)
+			bot.Send(mensaje)
+			proximo = calendarApi.getNextEvent()
+			fechaProximo = calendarApi.getTimeNextEvent()
 		}
 	}
 }
