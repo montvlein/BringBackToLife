@@ -24,7 +24,7 @@ func init() {
 }
 
 const (
-	start string = "BIENVENIDE\n\n" + help
+	start string = "BIENVENIDE\nEl bot esta en desarrollo. Se usa un calendario publico.\n" + help
 	help string = "Comandos de ayuda\n" +
 	"help - muestra la lista de comandos\n" +
 	"open - abre el menu de opciones/teclado rapido\n" +
@@ -247,14 +247,14 @@ func (calApi googleCalendar) createEvent(titulo, lugar, descripcion, inicio, fin
 
 func avisarProximoEvento(bot *tgbotapi.BotAPI) {
 	chat, _ := strconv.Atoi(os.Getenv("CHAT_ID"))
-	proximo := calendarApi.getNextEvent()
-	fechaProximo := calendarApi.getTimeNextEvent()
 
 	for range time.Tick(60 * time.Second) {
+		proximo := calendarApi.getNextEvent() // una vez iniciado el evento, hasta que finalice no pasa al siguiente evento.
+		fechaProximo := calendarApi.getTimeNextEvent()
 		fecha, _ := time.Parse(time.RFC3339,fechaProximo)
 		diferencia := time.Until(fecha)
 		minutosFaltantes := int(diferencia.Minutes())
-		log.Printf("faltan %v minutos para enviar el proximo evento...\n", minutosFaltantes)
+		log.Printf("faltan %v minutos para el proximo evento...\n", minutosFaltantes)
 		switch minutosFaltantes {
 		case 30:
 			mensaje := tgbotapi.NewMessage(int64(chat),"Faltan 30 min para el evento.\n" + proximo)
@@ -262,8 +262,6 @@ func avisarProximoEvento(bot *tgbotapi.BotAPI) {
 		case 0:
 			mensaje := tgbotapi.NewMessage(int64(chat),"Es ahora... " + proximo)
 			bot.Send(mensaje)
-			proximo = calendarApi.getNextEvent()
-			fechaProximo = calendarApi.getTimeNextEvent()
 		}
 	}
 }
